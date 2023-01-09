@@ -10,6 +10,12 @@ sixteen_categories =  hm.get_human_object_recognition_categories()
 sixteen_categories_ind = {}
 for ind, cat in enumerate(sixteen_categories):
     sixteen_categories_ind[cat] = ind
+
+# layer_names = ['input_1', 'block1_conv1', 'block1_conv2', 'block1_pool', 
+# 'block2_conv1', 'block2_conv2', 'block2_pool', 'block3_conv1', 'block3_conv2', 
+# 'block3_conv3', 'block3_pool', 'block4_conv1', 'block4_conv2', 'block4_conv3', 
+# 'block4_pool', 'block5_conv1', 'block5_conv2', 'block5_conv3', 'block5_pool', 
+# 'flatten', 'fc1', 'fc2', 'predictions']
     
 def get_tensors(session_no):
     human_data_df= pd.read_csv(
@@ -34,31 +40,62 @@ human_4 = get_tensors(4)
 
 mean_human_decision = np.stack((human_1, human_2, human_3, human_4), -1).mean(-1)
 
-harmonized_distances_df = pd.read_csv( "/Users/stephanie/Desktop/Serre Lab/controversial_result_1/sixteen_way_class2/harmonized_classifier_margins_2500.csv")
-baseline_distances_df = pd.read_csv( "/Users/stephanie/Desktop/Serre Lab/controversial_result_1/sixteen_way_class2/baseline_classifier_margins_2500.csv")
+# harmonized_dist_path =  "/Users/stephanie/Desktop/Serre Lab/controversial_result_1/sixteen_way_class2/harmonized_classifier_margins_2500.csv"
+# baseline_dist_path = "/Users/stephanie/Desktop/Serre Lab/controversial_result_1/sixteen_way_class2/baseline_classifier_margins_2500.csv"
 
-harmonized_distances = harmonized_distances_df.values[~np.isnan(mean_human_decision).any(axis=1)]
-baseline_distances = baseline_distances_df.values[~np.isnan(mean_human_decision).any(axis=1)]
-mean_human_decision = mean_human_decision[~np.isnan(mean_human_decision).any(axis=1)]
-print(harmonized_distances.shape)
-print(baseline_distances.shape)
-print(mean_human_decision.shape)
-# harmonized_distances = harmonized_distances_df.values[0:(mean_human_decision.shape[0]), :]
-# baseline_distances = baseline_distances_df.values[0:(mean_human_decision.shape[0]), :]
-
-harmonized_correlation = sp.spatial.distance.cdist(mean_human_decision.T, harmonized_distances.T, "correlation")
-harmonized_correlation = harmonized_correlation.diagonal()
-baseline_correlation = sp.spatial.distance.cdist(mean_human_decision.T, baseline_distances.T, "correlation")
-baseline_correlation = baseline_correlation.diagonal()
+harmonized_dist_path_fc1 =  "/Users/stephanie/Desktop/Serre Lab/controversial_result_1/layers_sixteen_way_class/harmonized_classifier_margins_fc1.csv"
+baseline_dist_path_fc1 = "/Users/stephanie/Desktop/Serre Lab/controversial_result_1/layers_sixteen_way_class/baseline_classifier_margins_fc1.csv"
+harmonized_dist_path_fc2 =  "/Users/stephanie/Desktop/Serre Lab/controversial_result_1/layers_sixteen_way_class/harmonized_classifier_margins_fc2.csv"
+baseline_dist_path_fc2 = "/Users/stephanie/Desktop/Serre Lab/controversial_result_1//layers_sixteen_way_class/baseline_classifier_margins_fc2.csv"
 
 
+# this uses the cdist correlation distances
+# harmonized_correlation = sp.spatial.distance.cdist(mean_human_decision.T, harmonized_distances.T, "correlation")
+# harmonized_correlation = harmonized_correlation.diagonal()
+# baseline_correlation = sp.spatial.distance.cdist(mean_human_decision.T, baseline_distances.T, "correlation")
+# baseline_correlation = baseline_correlation.diagonal()
 
-plt.plot(np.arange(0, 16), harmonized_correlation, c="r", label='Harmonized distance distance')
-plt.plot(np.arange(0, 16), baseline_correlation, c="b", label="Baseline correlation distance")
-ax = plt.gca()
-ax.legend()
-ax.set_xticks(np.arange(0, 16), sixteen_categories)
-ax.set_xticklabels(sixteen_categories, rotation = 45)
-plt.tight_layout()
-plt.savefig("/Users/stephanie/Desktop/Serre Lab/controversial_result_1/sixteen_way_class2/test_plt2.png")
+from scipy import stats
 
+
+def get_correlation(res): 
+    human_correlation = []
+    model_ind = 16
+    for correlation in res[:16]:
+        print(correlation.shape)
+        human_correlation.append(correlation[model_ind])
+        model_ind +=1
+    return human_correlation
+
+
+def generate_correlation_plot(harmonized_logits_path, baseline_logits_path, mean_human_decision, save_dir):
+    harmonized_distances_df = pd.read_csv(harmonized_logits_path)
+    baseline_distances_df = pd.read_csv(baseline_logits_path)
+
+    harmonized_distances = harmonized_distances_df.values[~np.isnan(mean_human_decision).any(axis=1)]
+    baseline_distances = baseline_distances_df.values[~np.isnan(mean_human_decision).any(axis=1)]
+    mean_human_decision = mean_human_decision[~np.isnan(mean_human_decision).any(axis=1)]
+    print(harmonized_distances.shape)
+    print(baseline_distances.shape)
+    print(mean_human_decision.shape)
+
+    res_harmonized = stats.spearmanr(mean_human_decision, harmonized_distances)
+    res_baseline = stats.spearmanr(mean_human_decision, baseline_distances)
+
+    harmonized_correlation = get_correlation(res_harmonized.correlation)
+    baseline_correlation = get_correlation(res_baseline.correlation)
+
+    plt.plot(np.arange(0, 16), harmonized_correlation, c="r", label='Harmonized distance distance')
+    plt.plot(np.arange(0, 16), baseline_correlation, c="b", label="Baseline correlation distance")
+    ax = plt.gca()
+    ax.legend()
+    ax.set_xticks(np.arange(0, 16), sixteen_categories)
+    ax.set_xticklabels(sixteen_categories, rotation = 45)
+    plt.tight_layout()
+    plt.savefig("/Users/stephanie/Desktop/Serre Lab/controversial_result_1/layers_sixteen_way_class/spearmann_plt_"+save_dir+".png")
+    plt.show()
+
+
+
+generate_correlation_plot(harmonized_dist_path_fc1, baseline_dist_path_fc1, mean_human_decision, 'fc1')
+generate_correlation_plot(harmonized_dist_path_fc2, baseline_dist_path_fc2, mean_human_decision, 'fc2')
